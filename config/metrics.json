@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "tables": {
+    "customers": {
+      "description": "Registered customer accounts",
+      "synonyms": ["customer", "clients", "client", "users", "user", "buyer", "buyers", "shoppers", "shopper", "accounts"],
+      "primary_key": "id",
+      "columns": {
+        "id": "Unique identifier for customer",
+        "name": "Full name of the customer",
+        "email": "Customer email address",
+        "signup_date": "Date when customer registered"
+      }
+    },
+    "orders": {
+      "description": "Orders placed by customers",
+      "synonyms": ["order", "purchases", "purchase", "transactions", "transaction", "sales", "sale", "bookings"],
+      "primary_key": "id",
+      "foreign_keys": {
+        "customer_id": "customers.id"
+      },
+      "columns": {
+        "id": "Unique order identifier",
+        "customer_id": "Foreign key referencing customers.id",
+        "order_date": "Date when the order was placed",
+        "status": "Order status (pending, completed, cancelled, refunded)"
+      }
+    },
+    "payments": {
+      "description": "Payment records associated with orders",
+      "synonyms": ["payment", "charges", "charge", "settlements", "billing", "revenue", "spend", "spending", "amount"],
+      "primary_key": "id",
+      "foreign_keys": {
+        "order_id": "orders.id"
+      },
+      "columns": {
+        "id": "Unique payment identifier",
+        "order_id": "Foreign key referencing orders.id",
+        "amount": "Monetary amount of the transaction in USD",
+        "payment_status": "Payment status (successful, failed, refunded)",
+        "payment_date": "Timestamp or date when payment was processed"
+      }
+    }
+  },
+  "metrics": {
+    "gross_revenue": {
+      "name": "Gross Revenue",
+      "description": "Total revenue from all successful payments before deductions",
+      "sql_expression": "SUM(payments.amount)",
+      "filters": "payments.payment_status = 'successful'",
+      "required_tables": ["payments"]
+    },
+    "net_revenue": {
+      "name": "Net Revenue",
+      "description": "Total revenue from successful payments excluding refunded orders",
+      "sql_expression": "SUM(payments.amount)",
+      "filters": "payments.payment_status = 'successful' AND orders.status != 'refunded'",
+      "required_tables": ["payments", "orders"]
+    },
+    "completed_orders": {
+      "name": "Completed Orders",
+      "description": "Count of all successfully placed and fulfilled orders",
+      "sql_expression": "COUNT(DISTINCT orders.id)",
+      "filters": "orders.status = 'completed'",
+      "required_tables": ["orders"]
+    },
+    "active_customer": {
+      "name": "Active Customer",
+      "description": "Customers who placed at least one completed order within the last 90 days",
+      "sql_expression": "COUNT(DISTINCT customers.id)",
+      "filters": "orders.status = 'completed' AND orders.order_date >= CURRENT_DATE - INTERVAL '90 days'",
+      "required_tables": ["customers", "orders"]
+    },
+    "average_order_value": {
+      "name": "Average Order Value (AOV)",
+      "description": "Average payment amount for completed orders",
+      "sql_expression": "AVG(payments.amount)",
+      "filters": "payments.payment_status = 'successful' AND orders.status = 'completed'",
+      "required_tables": ["orders", "payments"]
+    },
+    "top_customers": {
+      "name": "Top Customers",
+      "description": "Customers ranked by total successful monetary spend",
+      "sql_expression": "SUM(payments.amount)",
+      "filters": "payments.payment_status = 'successful'",
+      "required_tables": ["customers", "orders", "payments"]
+    }
+  }
+}
