@@ -79,7 +79,9 @@ Text-to-SQL/
 │   │   ├── ollama_client.py    # Local Ollama client with JSON schema enforcement (RTX 3070 8GB)
 │   │   ├── groq_client.py      # Production Groq client (llama-3.3-70b-versatile)
 │   │   └── factory.py          # Provider factory with dynamic toggle
-│   ├── generator/              # SQL synthesis & AST guardrails (Module 5)
+│   ├── generator/
+│   │   ├── guardrails.py       # sqlglot AST parser, read-only validator & SQL injection blocker
+│   │   └── sql_generator.py    # PostgreSQL synthesis engine, prompt compiler & self-corrector
 │   ├── execution/              # Sandboxed PostgreSQL execution & auto-retry (Module 6)
 │   ├── pipeline/               # Comparative evaluation pipelines (Module 7)
 │   └── cli/                    # Rich interactive terminal interface (Module 8)
@@ -87,7 +89,8 @@ Text-to-SQL/
 │   ├── test_semantic_layer.py  # Unit tests for Module 1
 │   ├── test_schema_retriever.py# Unit tests for Module 2
 │   ├── test_ambiguity.py       # Unit tests for Module 3
-│   └── test_llm_clients.py     # Unit tests for Module 4
+│   ├── test_llm_clients.py     # Unit tests for Module 4
+│   └── test_guardrails.py      # Unit tests for Module 5
 ```
 
 ---
@@ -175,6 +178,28 @@ Provides a unified interface for local GPU testing and cloud production inferenc
   * `get_llm_client()`: Factory function reading `settings.llm_provider` or runtime override to return the appropriate client.
 * **[`tests/test_llm_clients.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_llm_clients.py):**
   * Tests provider selection, mocked Ollama text and structured output, connection error handling, Groq API key validation, and mocked Groq completions.
+
+---
+
+### Module 5: SQL Generation, Dialect Compliance & AST Guardrails (REQ-SGES-01, REQ-SGES-02)
+
+Guarantees 100% read-only SQL safety and synthesizes PostgreSQL-dialect queries.
+
+* **[`clarifysql/generator/guardrails.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/generator/guardrails.py):**
+  * AST parser and validator powered by `sqlglot` targeting PostgreSQL dialect.
+  * Enforces single-statement execution (rejecting multi-statement SQL injection attacks like `SELECT 1; DROP TABLE users;`).
+  * Enforces root statement is strictly `SELECT` or `UNION`.
+  * Deep AST traversal rejecting any statement or CTE containing mutating operations: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `COMMAND`, `PRAGMA`, `GRANT`, `REVOKE`.
+  * Exposes `validate_sql(sql)` and helper `is_safe(sql)`.
+* **[`clarifysql/generator/sql_generator.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/generator/sql_generator.py):**
+  * Formulates synthesis prompts incorporating schema DDL, certified metrics, and clarified user instructions.
+  * Connects with `BaseLLMClient` to generate SQL and routes output through `ASTGuardrail`.
+  * Provides `correct_sql()` to support the automated self-correction loop when database runtime errors occur.
+* **[`tests/test_guardrails.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_guardrails.py):**
+  * Tests simple SELECTs, joins, CTEs, UNIONs, and markdown cleanup.
+  * Tests blocking of all mutating queries (`DROP`, `DELETE`, `UPDATE`, `INSERT`, `ALTER`, `TRUNCATE`, `CREATE`).
+  * Tests multi-statement injection blocking and mutating CTE blocking.
+  * Tests `SQLGenerator` prompt compilation, LLM output validation, unsafe output blocking, and error correction.
 
 ---
 
