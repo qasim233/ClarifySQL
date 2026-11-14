@@ -82,15 +82,20 @@ Text-to-SQL/
 │   ├── generator/
 │   │   ├── guardrails.py       # sqlglot AST parser, read-only validator & SQL injection blocker
 │   │   └── sql_generator.py    # PostgreSQL synthesis engine, prompt compiler & self-corrector
-│   ├── execution/              # Sandboxed PostgreSQL execution & auto-retry (Module 6)
+│   ├── execution/
+│   │   ├── models.py           # ExecutionResult model with timing & diagnostics
+│   │   └── sandbox.py          # Sandboxed PostgreSQL execution, timeout, truncation & retry loop
 │   ├── pipeline/               # Comparative evaluation pipelines (Module 7)
 │   └── cli/                    # Rich interactive terminal interface (Module 8)
+├── scripts/
+│   └── seed_supabase.py        # Supabase DDL migration & eCommerce seed script
 ├── tests/
 │   ├── test_semantic_layer.py  # Unit tests for Module 1
 │   ├── test_schema_retriever.py# Unit tests for Module 2
 │   ├── test_ambiguity.py       # Unit tests for Module 3
 │   ├── test_llm_clients.py     # Unit tests for Module 4
-│   └── test_guardrails.py      # Unit tests for Module 5
+│   ├── test_guardrails.py      # Unit tests for Module 5
+│   └── test_execution.py       # Unit tests for Module 6
 ```
 
 ---
@@ -203,6 +208,27 @@ Guarantees 100% read-only SQL safety and synthesizes PostgreSQL-dialect queries.
 
 ---
 
+### Module 6: Sandboxed Execution & Auto-Retry Loop (REQ-SGES-03, REQ-SGES-04)
+
+Executes generated queries in a secure PostgreSQL sandbox with automated failure recovery.
+
+* **[`clarifysql/execution/models.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/execution/models.py):**
+  * `ExecutionResult`: Encapsulates `success`, column names, rows, row count, truncation status, execution time in ms, error messages, retry count, and executed SQL.
+* **[`clarifysql/execution/sandbox.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/execution/sandbox.py):**
+  * Enforces read-only sessions: `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;`.
+  * Enforces statement timeout: `SET statement_timeout = 10000;` (10-second cap).
+  * Automatically truncates result sets at 500 rows (`max_result_rows`).
+  * Features pre-execution AST validation so invalid or dangerous queries never reach the database.
+  * Implements automated self-correction loop: on syntax or runtime failure, catches error, sanitizes credentials, feeds error back to `SQLGenerator.correct_sql()`, and retries execution (maximum 2 retries).
+* **[`scripts/seed_supabase.py`](file:///home/tensor/Documents/Text-to-SQL/scripts/seed_supabase.py):**
+  * Automated migration and seeding script for Supabase PostgreSQL.
+  * Creates `customers`, `orders`, and `payments` tables with constraints and indexes.
+  * Inserts realistic seed data (10 customers, 25 orders, 25 payments) with diverse statuses and timestamps for ambiguity testing.
+* **[`tests/test_execution.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_execution.py):**
+  * Tests execution results, session configuration, row truncation, timeout enforcement, AST containment, and the self-correction retry loop.
+
+---
+
 ## 🛠️ Setup & Installation
 
 ### 1. Clone & Set Up Virtual Environment
@@ -223,6 +249,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 Edit `.env`:
+* Configure your Supabase connection string:
+  ```env
+  DATABASE_URL=postgresql://postgres.your-project-ref:your-password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+  ```
 * For local testing on an 8GB GPU machine (RTX 3070):
   ```env
   LLM_PROVIDER=ollama
@@ -236,7 +266,12 @@ Edit `.env`:
   GROQ_MODEL=llama-3.3-70b-versatile
   ```
 
-### 3. Run Test Suite
+### 3. Seed Supabase Database (Optional)
+```bash
+python scripts/seed_supabase.py
+```
+
+### 4. Run Test Suite
 ```bash
 pytest -v tests/
 ```
