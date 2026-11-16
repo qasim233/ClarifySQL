@@ -85,17 +85,26 @@ Text-to-SQL/
 │   ├── execution/
 │   │   ├── models.py           # ExecutionResult model with timing & diagnostics
 │   │   └── sandbox.py          # Sandboxed PostgreSQL execution, timeout, truncation & retry loop
-│   ├── pipeline/               # Comparative evaluation pipelines (Module 7)
+│   ├── pipeline/
+│   │   ├── direct_pipeline.py  # Pipeline A: Baseline direct Text-to-SQL
+│   │   └── clarifysql_pipeline.py # Pipeline B: Active ambiguity resolution & SQL synthesis
 │   └── cli/                    # Rich interactive terminal interface (Module 8)
+├── benchmark/
+│   ├── dataset.json            # 30-query verified benchmark (10 unambiguous, 20 ambiguous)
+│   ├── metrics.py              # Precision, Recall, Accuracy & Divergence calculators
+│   └── runner.py               # Comparative evaluation runner (Pipeline A vs. Pipeline B)
 ├── scripts/
-│   └── seed_supabase.py        # Supabase DDL migration & eCommerce seed script
+│   ├── seed_supabase.py        # Supabase DDL migration & eCommerce seed script
+│   └── run_benchmark.py        # CLI entry point to run comparative benchmark suite
 ├── tests/
 │   ├── test_semantic_layer.py  # Unit tests for Module 1
 │   ├── test_schema_retriever.py# Unit tests for Module 2
 │   ├── test_ambiguity.py       # Unit tests for Module 3
 │   ├── test_llm_clients.py     # Unit tests for Module 4
 │   ├── test_guardrails.py      # Unit tests for Module 5
-│   └── test_execution.py       # Unit tests for Module 6
+│   ├── test_execution.py       # Unit tests for Module 6
+│   ├── test_pipelines.py       # Unit tests for Module 7 pipelines
+│   └── test_benchmark.py       # Unit tests for Module 7 benchmark suite
 ```
 
 ---
@@ -229,6 +238,34 @@ Executes generated queries in a secure PostgreSQL sandbox with automated failure
 
 ---
 
+### Module 7: Comparative Pipelines & 30-Query Benchmark Suite (REQ-EVAL-01, REQ-EVAL-02)
+
+Empirically compares Pipeline A (Baseline Direct) against Pipeline B (ClarifySQL Active Resolution).
+
+* **[`clarifysql/pipeline/direct_pipeline.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/pipeline/direct_pipeline.py):**
+  * Implements Pipeline A: User Query $\rightarrow$ Direct SQL Synthesis $\rightarrow$ Execution.
+  * Demonstrates the failure mode of naive LLMs guessing arbitrary business metrics on underspecified queries.
+* **[`clarifysql/pipeline/clarifysql_pipeline.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/pipeline/clarifysql_pipeline.py):**
+  * Implements Pipeline B: User Query $\rightarrow$ ADCE Ambiguity Check $\rightarrow$ Interactive/Simulated Resolution $\rightarrow$ Augmented SQL Synthesis $\rightarrow$ Sandboxed Execution.
+  * Returns `needs_user_input=True` when executed interactively without prior resolution choice, or proceeds with clarified parameters.
+* **[`benchmark/dataset.json`](file:///home/tensor/Documents/Text-to-SQL/benchmark/dataset.json):**
+  * 30 verified benchmark queries covering:
+    * 10 Unambiguous queries (measuring 0 false-positive interruptions).
+    * 7 Metric ambiguities (*"best customers"*, *"high-value orders"*, *"average order value"*).
+    * 5 Temporal ambiguities (*"revenue last month"*, *"Q3 sales"*).
+    * 4 Schema & Entity ambiguities (*"sales volume"*, *"user transactions"*).
+    * 4 Granularity ambiguities (*"customer sales"*, *"revenue by customer"*).
+  * Each item includes ground-truth SQL and canonical simulated choices for automated headless benchmark evaluation.
+* **[`benchmark/metrics.py`](file:///home/tensor/Documents/Text-to-SQL/benchmark/metrics.py):**
+  * `QueryEvalResult` and `BenchmarkSummary` models.
+  * Computes Execution Accuracy (EX) for both pipelines, Ambiguity Detection Precision/Recall, False Interception Rate, and Semantic Divergence Rate (quantifying where naive direct generation silently calculates the wrong business data).
+* **[`benchmark/runner.py`](file:///home/tensor/Documents/Text-to-SQL/benchmark/runner.py) & [`scripts/run_benchmark.py`](file:///home/tensor/Documents/Text-to-SQL/scripts/run_benchmark.py):**
+  * Automated runner evaluating all 30 queries across both pipelines and printing formatted markdown comparison tables.
+* **[`tests/test_pipelines.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_pipelines.py) & [`tests/test_benchmark.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_benchmark.py):**
+  * Tests Pipeline A execution, Pipeline B clean query direct execution, Pipeline B ambiguous pausing and resolution, dataset integrity, metrics calculations, and runner execution.
+
+---
+
 ## 🛠️ Setup & Installation
 
 ### 1. Clone & Set Up Virtual Environment
@@ -271,7 +308,15 @@ Edit `.env`:
 python scripts/seed_supabase.py
 ```
 
-### 4. Run Test Suite
+### 4. Run Comparative Benchmark Suite
+```bash
+# Run 30-query benchmark comparing Pipeline A vs. Pipeline B
+python scripts/run_benchmark.py --provider ollama
+# Or with Groq in production:
+python scripts/run_benchmark.py --provider groq
+```
+
+### 5. Run Test Suite
 ```bash
 pytest -v tests/
 ```

@@ -1,0 +1,262 @@
+[
+  {
+    "id": 1,
+    "query": "List all customers who signed up after 2024-06-01",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM customers WHERE signup_date > '2024-06-01';"
+  },
+  {
+    "id": 2,
+    "query": "Count the total number of registered customers",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT COUNT(*) FROM customers;"
+  },
+  {
+    "id": 3,
+    "query": "Show all orders with status completed",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM orders WHERE status = 'completed';"
+  },
+  {
+    "id": 4,
+    "query": "Find the customer with email alice@example.com",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM customers WHERE email = 'alice@example.com';"
+  },
+  {
+    "id": 5,
+    "query": "List payments where amount is greater than 300",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM payments WHERE amount > 300;"
+  },
+  {
+    "id": 6,
+    "query": "Show all orders placed on 2024-03-15",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM orders WHERE order_date = '2024-03-15';"
+  },
+  {
+    "id": 7,
+    "query": "Count payments with payment_status failed",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT COUNT(*) FROM payments WHERE payment_status = 'failed';"
+  },
+  {
+    "id": 8,
+    "query": "List all orders for customer id 1",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM orders WHERE customer_id = 1;"
+  },
+  {
+    "id": 9,
+    "query": "Show payments processed in November 2024",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT * FROM payments WHERE payment_date >= '2024-11-01' AND payment_date < '2024-12-01';"
+  },
+  {
+    "id": 10,
+    "query": "Count how many orders have status pending",
+    "is_ambiguous": false,
+    "ambiguity_type": null,
+    "simulated_choice": null,
+    "ground_truth_sql": "SELECT COUNT(*) FROM orders WHERE status = 'pending';"
+  },
+  {
+    "id": 11,
+    "query": "Who are our best customers?",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Highest Total Spend",
+    "ground_truth_sql": "SELECT c.id, c.name, SUM(p.amount) AS total_spend FROM customers c JOIN orders o ON c.id = o.customer_id JOIN payments p ON o.id = p.order_id WHERE p.payment_status = 'successful' GROUP BY c.id, c.name ORDER BY total_spend DESC;"
+  },
+  {
+    "id": 12,
+    "query": "Show high-value orders",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Orders with payment amount over $300",
+    "ground_truth_sql": "SELECT o.id, o.customer_id, p.amount FROM orders o JOIN payments p ON o.id = p.order_id WHERE p.amount > 300 AND p.payment_status = 'successful';"
+  },
+  {
+    "id": 13,
+    "query": "Who are our active customers?",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Customers with completed orders within last 90 days",
+    "ground_truth_sql": "SELECT DISTINCT c.id, c.name FROM customers c JOIN orders o ON c.id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= CURRENT_DATE - INTERVAL '90 days';"
+  },
+  {
+    "id": 14,
+    "query": "What is our average order value?",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "AOV for completed orders with successful payment",
+    "ground_truth_sql": "SELECT AVG(p.amount) AS average_order_value FROM payments p JOIN orders o ON p.order_id = o.id WHERE p.payment_status = 'successful' AND o.status = 'completed';"
+  },
+  {
+    "id": 15,
+    "query": "Find our top spending accounts",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Rank customers by successful monetary payments",
+    "ground_truth_sql": "SELECT c.id, c.name, SUM(p.amount) AS total_spent FROM customers c JOIN orders o ON c.id = o.customer_id JOIN payments p ON o.id = p.order_id WHERE p.payment_status = 'successful' GROUP BY c.id, c.name ORDER BY total_spent DESC;"
+  },
+  {
+    "id": 16,
+    "query": "Which customers are churned?",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Customers with no completed orders in over 180 days",
+    "ground_truth_sql": "SELECT c.id, c.name FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id AND o.status = 'completed' AND o.order_date >= CURRENT_DATE - INTERVAL '180 days');"
+  },
+  {
+    "id": 17,
+    "query": "Show the most successful customer accounts",
+    "is_ambiguous": true,
+    "ambiguity_type": "METRIC",
+    "simulated_choice": "A",
+    "canonical_label": "Customers ranked by gross successful payment revenue",
+    "ground_truth_sql": "SELECT c.id, c.name, SUM(p.amount) AS revenue FROM customers c JOIN orders o ON c.id = o.customer_id JOIN payments p ON o.id = p.order_id WHERE p.payment_status = 'successful' GROUP BY c.id, c.name ORDER BY revenue DESC;"
+  },
+  {
+    "id": 18,
+    "query": "Show revenue for last month",
+    "is_ambiguous": true,
+    "ambiguity_type": "TEMPORAL",
+    "simulated_choice": "A",
+    "canonical_label": "Revenue attributed to order placement date",
+    "ground_truth_sql": "SELECT SUM(p.amount) AS revenue FROM payments p JOIN orders o ON p.order_id = o.id WHERE p.payment_status = 'successful' AND o.order_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month') AND o.order_date < DATE_TRUNC('month', CURRENT_DATE);"
+  },
+  {
+    "id": 19,
+    "query": "Show total sales in Q3 2024",
+    "is_ambiguous": true,
+    "ambiguity_type": "TEMPORAL",
+    "simulated_choice": "A",
+    "canonical_label": "By order creation date in Q3 (July to September)",
+    "ground_truth_sql": "SELECT SUM(p.amount) AS sales FROM payments p JOIN orders o ON p.order_id = o.id WHERE p.payment_status = 'successful' AND o.order_date >= '2024-07-01' AND o.order_date <= '2024-09-30';"
+  },
+  {
+    "id": 20,
+    "query": "How many purchases were made in October 2024?",
+    "is_ambiguous": true,
+    "ambiguity_type": "TEMPORAL",
+    "simulated_choice": "A",
+    "canonical_label": "Count of orders created in October 2024",
+    "ground_truth_sql": "SELECT COUNT(*) FROM orders WHERE order_date >= '2024-10-01' AND order_date <= '2024-10-31' AND status = 'completed';"
+  },
+  {
+    "id": 21,
+    "query": "Show revenue trends this year",
+    "is_ambiguous": true,
+    "ambiguity_type": "TEMPORAL",
+    "simulated_choice": "A",
+    "canonical_label": "Monthly revenue by payment processing date",
+    "ground_truth_sql": "SELECT DATE_TRUNC('month', payment_date) AS month, SUM(amount) AS revenue FROM payments WHERE payment_status = 'successful' AND payment_date >= '2024-01-01' GROUP BY month ORDER BY month;"
+  },
+  {
+    "id": 22,
+    "query": "Find recent orders placed recently",
+    "is_ambiguous": true,
+    "ambiguity_type": "TEMPORAL",
+    "simulated_choice": "A",
+    "canonical_label": "Orders placed within the last 30 days",
+    "ground_truth_sql": "SELECT * FROM orders WHERE order_date >= CURRENT_DATE - INTERVAL '30 days' ORDER BY order_date DESC;"
+  },
+  {
+    "id": 23,
+    "query": "What was our sales volume in 2024?",
+    "is_ambiguous": true,
+    "ambiguity_type": "SCHEMA_ENTITY",
+    "simulated_choice": "B",
+    "canonical_label": "Total Dollar Amount (Payments)",
+    "ground_truth_sql": "SELECT SUM(amount) AS total_dollar_volume FROM payments WHERE payment_status = 'successful' AND payment_date >= '2024-01-01' AND payment_date <= '2024-12-31';"
+  },
+  {
+    "id": 24,
+    "query": "Show total customer spending",
+    "is_ambiguous": true,
+    "ambiguity_type": "SCHEMA_ENTITY",
+    "simulated_choice": "A",
+    "canonical_label": "Sum of successful payment charges",
+    "ground_truth_sql": "SELECT SUM(amount) AS total_spending FROM payments WHERE payment_status = 'successful';"
+  },
+  {
+    "id": 25,
+    "query": "What are our total sales?",
+    "is_ambiguous": true,
+    "ambiguity_type": "SCHEMA_ENTITY",
+    "simulated_choice": "B",
+    "canonical_label": "Total gross revenue from successful payments",
+    "ground_truth_sql": "SELECT SUM(amount) FROM payments WHERE payment_status = 'successful';"
+  },
+  {
+    "id": 26,
+    "query": "Show all user transactions",
+    "is_ambiguous": true,
+    "ambiguity_type": "SCHEMA_ENTITY",
+    "simulated_choice": "A",
+    "canonical_label": "Completed order transactions with payment status",
+    "ground_truth_sql": "SELECT o.id AS order_id, o.customer_id, o.order_date, p.amount, p.payment_status FROM orders o JOIN payments p ON o.id = p.order_id;"
+  },
+  {
+    "id": 27,
+    "query": "Show customer sales",
+    "is_ambiguous": true,
+    "ambiguity_type": "GRANULARITY",
+    "simulated_choice": "A",
+    "canonical_label": "Aggregated total spend per customer",
+    "ground_truth_sql": "SELECT c.id, c.name, SUM(p.amount) AS total_spend FROM customers c JOIN orders o ON c.id = o.customer_id JOIN payments p ON o.id = p.order_id WHERE p.payment_status = 'successful' GROUP BY c.id, c.name;"
+  },
+  {
+    "id": 28,
+    "query": "Break down revenue by customer",
+    "is_ambiguous": true,
+    "ambiguity_type": "GRANULARITY",
+    "simulated_choice": "A",
+    "canonical_label": "Grouped total per customer account",
+    "ground_truth_sql": "SELECT c.id, c.name, SUM(p.amount) AS revenue FROM customers c JOIN orders o ON c.id = o.customer_id JOIN payments p ON o.id = p.order_id WHERE p.payment_status = 'successful' GROUP BY c.id, c.name ORDER BY revenue DESC;"
+  },
+  {
+    "id": 29,
+    "query": "Show sales by date",
+    "is_ambiguous": true,
+    "ambiguity_type": "GRANULARITY",
+    "simulated_choice": "A",
+    "canonical_label": "Aggregated daily totals",
+    "ground_truth_sql": "SELECT payment_date, SUM(amount) AS daily_sales FROM payments WHERE payment_status = 'successful' GROUP BY payment_date ORDER BY payment_date;"
+  },
+  {
+    "id": 30,
+    "query": "Show order statistics",
+    "is_ambiguous": true,
+    "ambiguity_type": "GRANULARITY",
+    "simulated_choice": "A",
+    "canonical_label": "Overall company-wide summary aggregates",
+    "ground_truth_sql": "SELECT COUNT(*) AS total_orders, COUNT(DISTINCT customer_id) AS distinct_buyers FROM orders;"
+  }
+]
