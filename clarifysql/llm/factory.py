@@ -20,7 +20,7 @@ def get_llm_client(
         return OllamaClient(
             model=model or settings.ollama_model,
             base_url=kwargs.get("base_url") or settings.ollama_base_url,
-            timeout_seconds=kwargs.get("timeout_seconds", 60.0)
+            timeout_seconds=kwargs.get("timeout_seconds") or settings.ollama_timeout_seconds
         )
     elif active_provider == "groq":
         return GroqClient(

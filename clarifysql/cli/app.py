@@ -97,8 +97,12 @@ def ask(
 
     catalog, schema, _, pipeline_b = _get_pipeline_context(provider)
 
-    with console.status("[bold cyan]Analyzing query ambiguity & database schema...[/bold cyan]"):
-        result = pipeline_b.run(query=query, resolution_choice=choice)
+    try:
+        with console.status("[bold cyan]Analyzing query ambiguity & database schema...[/bold cyan]"):
+            result = pipeline_b.run(query=query, resolution_choice=choice)
+    except Exception as err:
+        console.print(f"\n[bold red]Error running ClarifySQL:[/bold red] {err}")
+        raise typer.Exit(code=1)
 
     # If ambiguous and user choice is needed
     if result.needs_user_input and result.ambiguity_check:
@@ -119,8 +123,12 @@ def ask(
 
         user_input = Prompt.ask("\nYour choice", default="A")
 
-        with console.status("[bold cyan]Synthesizing SQL with clarified business intent...[/bold cyan]"):
-            result = pipeline_b.run(query=query, resolution_choice=user_input)
+        try:
+            with console.status("[bold cyan]Synthesizing SQL with clarified business intent...[/bold cyan]"):
+                result = pipeline_b.run(query=query, resolution_choice=user_input)
+        except Exception as err:
+            console.print(f"\n[bold red]Error during synthesis:[/bold red] {err}")
+            raise typer.Exit(code=1)
 
     # Display generated SQL
     if result.generated_sql:
@@ -147,9 +155,13 @@ def compare(
 
     catalog, schema, pipeline_a, pipeline_b = _get_pipeline_context(provider)
 
-    with console.status("[bold cyan]Running Pipeline A (Direct) and Pipeline B (ClarifySQL)...[/bold cyan]"):
-        res_a = pipeline_a.run(query)
-        res_b = pipeline_b.run(query, resolution_choice=choice)
+    try:
+        with console.status("[bold cyan]Running Pipeline A (Direct) and Pipeline B (ClarifySQL)...[/bold cyan]"):
+            res_a = pipeline_a.run(query)
+            res_b = pipeline_b.run(query, resolution_choice=choice)
+    except Exception as err:
+        console.print(f"\n[bold red]Error running comparative analysis:[/bold red] {err}")
+        raise typer.Exit(code=1)
 
     # 1. Pipeline A Output
     console.print("\n[bold red]Pipeline A: Baseline Direct (Naive Guessing)[/bold red]")

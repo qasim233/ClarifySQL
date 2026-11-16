@@ -30,8 +30,12 @@ class Settings(BaseSettings):
         description="Base URL for local Ollama daemon"
     )
     ollama_model: str = Field(
-        default="llama3.1:8b",
+        default="gemma2:9b",
         description="Ollama model tag suitable for 8GB VRAM (e.g. llama3.1:8b, qwen2.5-coder:7b)"
+    )
+    ollama_timeout_seconds: float = Field(
+        default=300.0,
+        description="Timeout in seconds for Ollama requests (allows time for local model load into VRAM)"
     )
 
     # Groq settings (Production)

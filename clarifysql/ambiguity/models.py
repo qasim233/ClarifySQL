@@ -1,5 +1,6 @@
+import json
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -36,6 +37,54 @@ class AmbiguityCheckResult(BaseModel):
         default_factory=list,
         description="Between 2 and 4 distinct, mutually exclusive business interpretations"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                return data
+        if not isinstance(data, dict):
+            return data
+
+        # 1. Alias handling for ambiguity_type
+        if not data.get("ambiguity_type"):
+            for alias in ["type", "ambiguity_dimension", "dimension", "category"]:
+                if data.get(alias):
+                    data["ambiguity_type"] = data[alias]
+                    break
+
+        # 2. Case normalization and mapping for ambiguity_type
+        raw_type = data.get("ambiguity_type")
+        if isinstance(raw_type, str):
+            raw_upper = raw_type.strip().upper()
+            if "METRIC" in raw_upper:
+                data["ambiguity_type"] = "METRIC"
+            elif "TEMP" in raw_upper or "DATE" in raw_upper or "TIME" in raw_upper:
+                data["ambiguity_type"] = "TEMPORAL"
+            elif "SCHEMA" in raw_upper or "ENTITY" in raw_upper:
+                data["ambiguity_type"] = "SCHEMA_ENTITY"
+            elif "GRANULAR" in raw_upper or "AGGREGAT" in raw_upper:
+                data["ambiguity_type"] = "GRANULARITY"
+            else:
+                data["ambiguity_type"] = "METRIC"
+        elif data.get("is_ambiguous") and not raw_type:
+            data["ambiguity_type"] = "METRIC"
+
+        # 3. Handle explanation missing
+        if data.get("is_ambiguous") and not data.get("explanation"):
+            data["explanation"] = "Query contains ambiguous business terms requiring clarification."
+
+        # 4. Handle options ID normalization
+        options = data.get("options")
+        if isinstance(options, list):
+            for idx, opt in enumerate(options):
+                if isinstance(opt, dict) and not opt.get("id"):
+                    opt["id"] = chr(65 + idx)
+
+        return data
 
     @model_validator(mode="after")
     def validate_ambiguity_consistency(self) -> "AmbiguityCheckResult":

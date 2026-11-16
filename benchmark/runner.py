@@ -36,36 +36,51 @@ class BenchmarkRunner:
         simulated_choice = item.get("simulated_choice")
 
         # 1. Execute Pipeline A (Direct)
-        res_a = self.pipeline_a.run(query_text)
-        success_a = res_a.execution_result.success if res_a.execution_result else False
-        time_a = res_a.execution_result.execution_time_ms if res_a.execution_result else 0.0
+        try:
+            res_a = self.pipeline_a.run(query_text)
+            success_a = res_a.execution_result.success if res_a.execution_result else False
+            time_a = res_a.execution_result.execution_time_ms if res_a.execution_result else 0.0
+            sql_a = res_a.generated_sql
+        except Exception as e_a:
+            success_a = False
+            time_a = 0.0
+            sql_a = f"ERROR: {e_a}"
 
         # 2. Execute Pipeline B (ClarifySQL with simulated choice for ambiguous queries)
-        res_b = self.pipeline_b.run(query_text, resolution_choice=simulated_choice)
-        success_b = res_b.execution_result.success if res_b.execution_result else False
-        time_b = res_b.execution_result.execution_time_ms if res_b.execution_result else 0.0
+        try:
+            res_b = self.pipeline_b.run(query_text, resolution_choice=simulated_choice)
+            success_b = res_b.execution_result.success if res_b.execution_result else False
+            time_b = res_b.execution_result.execution_time_ms if res_b.execution_result else 0.0
+            sql_b = res_b.generated_sql
+            is_ambig_detected = res_b.is_ambiguous
+            ambig_type_detected = str(res_b.ambiguity_type.value) if res_b.ambiguity_type else None
+        except Exception as e_b:
+            success_b = False
+            time_b = 0.0
+            sql_b = f"ERROR: {e_b}"
+            is_ambig_detected = False
+            ambig_type_detected = None
 
         # 3. Check for Semantic Divergence
         # For ambiguous queries, if Pipeline A's hallucinated SQL does not match Pipeline B's
         # clarified SQL, a semantic divergence (silent data deviation) has occurred.
         semantic_diverged = False
         if is_ambig_gt:
-            # Compare generated SQL
-            sql_a = (res_a.generated_sql or "").strip().lower()
-            sql_b = (res_b.generated_sql or "").strip().lower()
-            semantic_diverged = (sql_a != sql_b)
+            clean_a = (sql_a or "").strip().lower()
+            clean_b = (sql_b or "").strip().lower()
+            semantic_diverged = (clean_a != clean_b and not clean_a.startswith("error") and not clean_b.startswith("error"))
 
         return QueryEvalResult(
             id=query_id,
             query=query_text,
             is_ambiguous_ground_truth=is_ambig_gt,
-            is_ambiguous_detected=res_b.is_ambiguous,
+            is_ambiguous_detected=is_ambig_detected,
             ambiguity_type_ground_truth=ambig_type_gt,
-            ambiguity_type_detected=str(res_b.ambiguity_type.value) if res_b.ambiguity_type else None,
+            ambiguity_type_detected=ambig_type_detected,
             pipeline_a_success=success_a,
             pipeline_b_success=success_b,
-            pipeline_a_sql=res_a.generated_sql,
-            pipeline_b_sql=res_b.generated_sql,
+            pipeline_a_sql=sql_a,
+            pipeline_b_sql=sql_b,
             semantic_diverged=semantic_diverged,
             execution_time_a_ms=time_a,
             execution_time_b_ms=time_b

@@ -32,6 +32,22 @@ def test_unambiguous_model_valid():
     assert res.ambiguity_type is None
 
 
+def test_ambiguity_model_normalization():
+    res = AmbiguityCheckResult.model_validate({
+        "is_ambiguous": True,
+        "type": "metric",
+        "explanation": "Test",
+        "options": [
+            {"label": "Opt 1", "description": "Desc 1", "implied_sql_logic": "SELECT 1"},
+            {"label": "Opt 2", "description": "Desc 2", "implied_sql_logic": "SELECT 2"}
+        ]
+    })
+    assert res.is_ambiguous is True
+    assert res.ambiguity_type == AmbiguityDimension.METRIC
+    assert res.options[0].id == "A"
+    assert res.options[1].id == "B"
+
+
 def test_ambiguous_model_valid():
     res = AmbiguityCheckResult(
         is_ambiguous=True,

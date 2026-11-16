@@ -88,6 +88,14 @@ def test_ollama_connection_error():
             client.generate("Hello")
 
 
+def test_ollama_timeout_error():
+    client = OllamaClient(base_url="http://localhost:11434", timeout_seconds=10.0)
+
+    with patch("httpx.Client.post", side_effect=httpx.ReadTimeout("timed out")):
+        with pytest.raises(RuntimeError, match="Ollama request timed out after 10s"):
+            client.generate("Hello")
+
+
 def test_groq_missing_api_key():
     client = GroqClient(api_key=None)
     with pytest.raises(ValueError, match="GROQ_API_KEY is required"):

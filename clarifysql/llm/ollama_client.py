@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Optional, Type, TypeVar
 import httpx
 from pydantic import BaseModel
@@ -18,14 +19,16 @@ class OllamaClient(BaseLLMClient):
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
-        timeout_seconds: float = 60.0
+        timeout_seconds: Optional[float] = None
     ):
         self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
         self.model = model or settings.ollama_model
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = timeout_seconds if timeout_seconds is not None else settings.ollama_timeout_seconds
 
     def _get_client(self) -> httpx.Client:
-        return httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds)
+        # Generous read timeout allowing local GPU to load model into VRAM
+        timeout = httpx.Timeout(timeout=self.timeout_seconds, connect=15.0)
+        return httpx.Client(base_url=self.base_url, timeout=timeout)
 
     def generate(
         self,
@@ -52,6 +55,13 @@ class OllamaClient(BaseLLMClient):
                 resp.raise_for_status()
                 data = resp.json()
                 return data.get("message", {}).get("content", "").strip()
+        except httpx.TimeoutException as err:
+            raise RuntimeError(
+                f"Ollama request timed out after {int(self.timeout_seconds)}s waiting for model '{self.model}'.\n"
+                f"Tips:\n"
+                f"1. Pre-warm the model in GPU memory: Open a terminal and run 'ollama run {self.model}'.\n"
+                f"2. You can increase timeout in .env: OLLAMA_TIMEOUT_SECONDS=600"
+            ) from err
         except httpx.ConnectError as err:
             raise RuntimeError(
                 f"Cannot connect to Ollama at '{self.base_url}'. "
@@ -71,7 +81,7 @@ class OllamaClient(BaseLLMClient):
     ) -> T:
         """
         Request structured JSON output from Ollama and validate with Pydantic.
-        Passes schema to Ollama format and appends schema guidelines to system prompt.
+        Uses format="json" for fast, reliable token generation without GBNF grammar freeze.
         """
         schema = response_model.model_json_schema()
         schema_instruction = (
@@ -91,7 +101,7 @@ class OllamaClient(BaseLLMClient):
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "format": schema,  # Ollama native JSON schema enforcement
+            "format": "json",  # Fast and reliable JSON mode across all Ollama versions
             "options": {"temperature": temperature}
         }
 
@@ -101,7 +111,20 @@ class OllamaClient(BaseLLMClient):
                 resp.raise_for_status()
                 data = resp.json()
                 raw_content = data.get("message", {}).get("content", "").strip()
+
+                # Clean markdown fences if model outputs ```json ... ```
+                if raw_content.startswith("```"):
+                    raw_content = re.sub(r"^```[a-zA-Z]*\n?", "", raw_content)
+                    raw_content = re.sub(r"\n?```$", "", raw_content).strip()
+
                 return response_model.model_validate_json(raw_content)
+        except httpx.TimeoutException as err:
+            raise RuntimeError(
+                f"Ollama request timed out after {int(self.timeout_seconds)}s waiting for model '{self.model}'.\n"
+                f"Tips:\n"
+                f"1. Pre-warm the model in GPU memory: Open a terminal and run 'ollama run {self.model}'.\n"
+                f"2. You can increase timeout in .env: OLLAMA_TIMEOUT_SECONDS=600"
+            ) from err
         except httpx.ConnectError as err:
             raise RuntimeError(
                 f"Cannot connect to Ollama at '{self.base_url}'. "
