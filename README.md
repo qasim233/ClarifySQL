@@ -6,7 +6,8 @@
 [![Database](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E.svg)](https://supabase.com)
 [![Pydantic](https://img.shields.io/badge/Validation-Pydantic_v2-red.svg)](https://docs.pydantic.dev/)
 [![SQL Safety](https://img.shields.io/badge/Guardrails-sqlglot-orange.svg)](https://github.com/tobymao/sqlglot)
-[![Testing](https://img.shields.io/badge/Tests-pytest-green.svg)](https://docs.pytest.org/)
+[![CLI](https://img.shields.io/badge/Interface-Typer%20%2B%20Rich-magenta.svg)](https://typer.tiangolo.com/)
+[![Testing](https://img.shields.io/badge/Tests-pytest%20(71%20passed)-green.svg)](https://docs.pytest.org/)
 
 ---
 
@@ -88,7 +89,8 @@ Text-to-SQL/
 │   ├── pipeline/
 │   │   ├── direct_pipeline.py  # Pipeline A: Baseline direct Text-to-SQL
 │   │   └── clarifysql_pipeline.py # Pipeline B: Active ambiguity resolution & SQL synthesis
-│   └── cli/                    # Rich interactive terminal interface (Module 8)
+│   └── cli/
+│       └── app.py              # Rich interactive terminal application (Typer / Rich)
 ├── benchmark/
 │   ├── dataset.json            # 30-query verified benchmark (10 unambiguous, 20 ambiguous)
 │   ├── metrics.py              # Precision, Recall, Accuracy & Divergence calculators
@@ -104,7 +106,10 @@ Text-to-SQL/
 │   ├── test_guardrails.py      # Unit tests for Module 5
 │   ├── test_execution.py       # Unit tests for Module 6
 │   ├── test_pipelines.py       # Unit tests for Module 7 pipelines
-│   └── test_benchmark.py       # Unit tests for Module 7 benchmark suite
+│   ├── test_benchmark.py       # Unit tests for Module 7 benchmark suite
+│   └── test_cli.py             # Unit tests for Module 8 Rich CLI
+├── pyproject.toml              # Project packaging & clarifysql console script
+└── requirements.txt            # Python dependencies
 ```
 
 ---
@@ -247,22 +252,30 @@ Empirically compares Pipeline A (Baseline Direct) against Pipeline B (ClarifySQL
   * Demonstrates the failure mode of naive LLMs guessing arbitrary business metrics on underspecified queries.
 * **[`clarifysql/pipeline/clarifysql_pipeline.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/pipeline/clarifysql_pipeline.py):**
   * Implements Pipeline B: User Query $\rightarrow$ ADCE Ambiguity Check $\rightarrow$ Interactive/Simulated Resolution $\rightarrow$ Augmented SQL Synthesis $\rightarrow$ Sandboxed Execution.
-  * Returns `needs_user_input=True` when executed interactively without prior resolution choice, or proceeds with clarified parameters.
 * **[`benchmark/dataset.json`](file:///home/tensor/Documents/Text-to-SQL/benchmark/dataset.json):**
-  * 30 verified benchmark queries covering:
-    * 10 Unambiguous queries (measuring 0 false-positive interruptions).
-    * 7 Metric ambiguities (*"best customers"*, *"high-value orders"*, *"average order value"*).
-    * 5 Temporal ambiguities (*"revenue last month"*, *"Q3 sales"*).
-    * 4 Schema & Entity ambiguities (*"sales volume"*, *"user transactions"*).
-    * 4 Granularity ambiguities (*"customer sales"*, *"revenue by customer"*).
-  * Each item includes ground-truth SQL and canonical simulated choices for automated headless benchmark evaluation.
+  * 30 verified benchmark queries covering 10 unambiguous queries and 20 ambiguous queries across 4 dimensions with ground-truth SQL and canonical simulated choices.
 * **[`benchmark/metrics.py`](file:///home/tensor/Documents/Text-to-SQL/benchmark/metrics.py):**
-  * `QueryEvalResult` and `BenchmarkSummary` models.
-  * Computes Execution Accuracy (EX) for both pipelines, Ambiguity Detection Precision/Recall, False Interception Rate, and Semantic Divergence Rate (quantifying where naive direct generation silently calculates the wrong business data).
+  * Computes Execution Accuracy (EX), Ambiguity Precision/Recall, False Interception Rate, and Semantic Divergence Rate.
 * **[`benchmark/runner.py`](file:///home/tensor/Documents/Text-to-SQL/benchmark/runner.py) & [`scripts/run_benchmark.py`](file:///home/tensor/Documents/Text-to-SQL/scripts/run_benchmark.py):**
   * Automated runner evaluating all 30 queries across both pipelines and printing formatted markdown comparison tables.
 * **[`tests/test_pipelines.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_pipelines.py) & [`tests/test_benchmark.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_benchmark.py):**
   * Tests Pipeline A execution, Pipeline B clean query direct execution, Pipeline B ambiguous pausing and resolution, dataset integrity, metrics calculations, and runner execution.
+
+---
+
+### Module 8: Rich Interactive Terminal Application (REQ-ICDR-01, REQ-ICDR-02, Section 3.2)
+
+Provides an intuitive, enterprise-grade command-line interface for business and technical operators.
+
+* **[`clarifysql/cli/app.py`](file:///home/tensor/Documents/Text-to-SQL/clarifysql/cli/app.py):**
+  * Built using `typer` and `rich`.
+  * Commands:
+    * `clarifysql ask "<query>"`: Interactive mode that automatically halts on ambiguous queries, displays a formatted table of business options (A, B, C, D), prompts the user for their choice or free text, and renders the result set in a clean Rich table with execution timing.
+    * `clarifysql compare "<query>"`: Side-by-side comparison mode running both Pipeline A and Pipeline B to visually inspect divergence and silent data corruption.
+    * `clarifysql benchmark`: Runs the 30-query benchmark with spinners and summary tables.
+    * `clarifysql schema`: Displays the cached database schema and certified business metrics catalog.
+* **[`tests/test_cli.py`](file:///home/tensor/Documents/Text-to-SQL/tests/test_cli.py):**
+  * Tests CLI help, schema output, unambiguous query execution, interactive ambiguous prompting, comparative execution, and benchmark execution via `CliRunner`.
 
 ---
 
@@ -277,8 +290,8 @@ cd ClarifySQL
 python3.12 -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies and clarifysql console script
+pip install -e .
 ```
 
 ### 2. Configure Environment Variables
@@ -308,12 +321,30 @@ Edit `.env`:
 python scripts/seed_supabase.py
 ```
 
-### 4. Run Comparative Benchmark Suite
+### 4. Interactive CLI Usage
+
+#### Ask a Query (Interactive Ambiguity Resolution)
 ```bash
-# Run 30-query benchmark comparing Pipeline A vs. Pipeline B
-python scripts/run_benchmark.py --provider ollama
-# Or with Groq in production:
-python scripts/run_benchmark.py --provider groq
+# Explicit query (executes immediately)
+clarifysql ask "How many customers signed up in 2024?"
+
+# Ambiguous query (pauses and prompts with options A, B, C)
+clarifysql ask "Who are our best customers?"
+```
+
+#### Side-by-Side Comparison (Pipeline A vs. Pipeline B)
+```bash
+clarifysql compare "Show last month's sales volume"
+```
+
+#### Run 30-Query Benchmark Suite
+```bash
+clarifysql benchmark --provider ollama
+```
+
+#### Inspect Active Schema & Certified Metrics
+```bash
+clarifysql schema
 ```
 
 ### 5. Run Test Suite
